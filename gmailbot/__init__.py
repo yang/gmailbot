@@ -37,6 +37,10 @@ def main(argv=sys.argv):
   print_labels_subparser = subparsers.add_parser('print-labels')
 
   feedback_pings_subparser = subparsers.add_parser('feedback-pings')
+  feedback_pings_subparser.add_argument('-n', '--dry-run', action='store_true',
+                                        help='Do not actually send emails')
+  feedback_pings_subparser.add_argument('-d', '--days', type=int, default=7,
+                                        help='Look for messages sent in past X days')
   feedback_pings_subparser.add_argument('users', help='Comma separated list of users')
 
   flags = parser.parse_args()
@@ -51,7 +55,8 @@ def main(argv=sys.argv):
 def feedback_pings(flags, service):
   pingees = set(user + '@infer.com' for user in flags.users.split(','))
   seen_pingees = set()
-  messageIds = service.users().messages().list(userId='me', q='to:product-feedback@infer.com newer_than:7d').execute()
+  query = 'to:product-feedback@infer.com newer_than:{}d'.format(flags.days)
+  messageIds = service.users().messages().list(userId='me', q=query).execute()
   log.info('got %s messages', len(messageIds['messages']))
   for messageId in messageIds['messages']:
     message = service.users().messages().get(userId='me', id=messageId['id']).execute()
@@ -65,7 +70,8 @@ def feedback_pings(flags, service):
     message = create_message(
         'product-feedback@infer.com', pingee, 'Product feedback!',
         'Just a friendly reminder to share any customer learnings/feedback from the past week, if you have any (no need to reply if none).  Thanks!')
-    send_message(service, 'me', message)
+    if not flags.dry_run:
+      send_message(service, 'me', message)
 
 
 def print_labels(service):
