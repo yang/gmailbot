@@ -56,15 +56,17 @@ def feedback_pings(flags, service):
   pingees = set(user + '@infer.com' for user in flags.users.split(','))
   seen_pingees = set()
   query = 'to:product-feedback@infer.com newer_than:{}d'.format(flags.days)
-  messageIds = service.users().messages().list(userId='me', q=query).execute()
-  log.info('got %s messages', len(messageIds['messages']))
-  for messageId in messageIds['messages']:
-    message = service.users().messages().get(userId='me', id=messageId['id']).execute()
+  messages_res = service.users().messages().list(userId='me', q=query).execute()
+  real_message_ids = messages_res.get('messages', [])
+  log.info('got %s messages', len(real_message_ids))
+  for message_id in real_message_ids:
+    message = service.users().messages().get(userId='me', id=message_id['id']).execute()
     headers = {header['name']: header['value'] for header in message['payload']['headers']}
     for pingee in pingees - seen_pingees:
       if pingee in headers['From']:
         seen_pingees.add(pingee)
         break
+  log.info('skipping the following people: %s', ', '.join(sorted(seen_pingees)))
   log.info('pinging the following people: %s', ', '.join(sorted(pingees - seen_pingees)))
   for pingee in pingees - seen_pingees:
     message = create_message(
